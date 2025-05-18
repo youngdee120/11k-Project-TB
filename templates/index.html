@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>TB-Scan • Upload</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/styles.css') }}">
+</head>
+<body>
+  <nav class="navbar">
+    <div class="logo"><a href="/">TB-Scan</a></div>
+    <div class="links">
+      <a href="/">Home</a>
+      <a href="/results">Results</a>
+    </div>
+  </nav>
+
+  <div class="container">
+    <h1>Upload Chest X-ray TO TEST FOR TB</h1>
+    <div id="dropArea" class="drop-area">
+      Drag &amp; Drop or <strong>Browse</strong>
+      <input type="file" id="fileInput" accept="image/*" style="display:none"/>
+      <button id="uploadBtn" type="button">Upload Image</button>
+      <p>or Paste Image (Ctrl+V)</p>
+      <img id="preview" class="preview" src="" alt="Preview" style="display:none"/>
+    </div>
+    <button id="analyzeBtn" disabled>Analyze</button>
+  </div>
+
+  <div class="spinner-overlay" id="spinner">
+    <div class="spinner"></div>
+  </div>
+
+  <script>
+    const dropArea = document.getElementById('dropArea'),
+          fileInput = document.getElementById('fileInput'),
+          uploadBtn = document.getElementById('uploadBtn'),
+          preview   = document.getElementById('preview'),
+          analyzeBtn= document.getElementById('analyzeBtn'),
+          spinner   = document.getElementById('spinner');
+    let file;
+
+    // Upload button triggers file input
+    uploadBtn.addEventListener('click', () => fileInput.click());
+
+    function loadFile(f) {
+      if (!f) return;
+      file = f;
+      const reader = new FileReader();
+      reader.onload = ev => {
+        preview.src = ev.target.result;
+        preview.style.display = 'block';
+        analyzeBtn.disabled = false;
+      };
+      reader.readAsDataURL(f);
+    }
+
+    // Handle file selection
+    fileInput.addEventListener('change', e => loadFile(e.target.files[0]));
+
+    // Drag & drop
+    dropArea.addEventListener('dragover', e => {
+      e.preventDefault();
+      dropArea.classList.add('hover');
+    });
+    dropArea.addEventListener('dragleave', () => dropArea.classList.remove('hover'));
+    dropArea.addEventListener('drop', e => {
+      e.preventDefault();
+      dropArea.classList.remove('hover');
+      loadFile(e.dataTransfer.files[0]);
+    });
+
+    // Paste image
+    document.addEventListener('paste', e => {
+      for (let item of e.clipboardData.items) {
+        if (item.type.startsWith('image')) loadFile(item.getAsFile());
+      }
+    });
+
+    // Analyze button
+    analyzeBtn.addEventListener('click', async () => {
+      if (!file) return;
+      spinner.style.visibility = 'visible';
+      const form = new FormData();
+      form.append('image', file);
+      const res = await fetch('/api/predict', { method: 'POST', body: form });
+      const data = await res.json();
+      spinner.style.visibility = 'hidden';
+
+      if (data.error) {
+        alert(data.error);
+        return;
+      }
+      sessionStorage.setItem('result', JSON.stringify(data));
+      sessionStorage.setItem('imageData', preview.src);
+      window.location.href = '/results';
+    });
+  </script>
+</body>
+</html>
